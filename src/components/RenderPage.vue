@@ -7,7 +7,8 @@ import {
   handleBottomOverlayUpload,
   handlePNGSequenceUpload,
   handleTopOverlayUpload,
-  downloadVideoFromPNGSequence
+  downloadVideoFromPNGSequence,
+  handleAudioUpload
 } from "@/Utils/PngUtils";
 
 export interface steps {
@@ -27,21 +28,25 @@ export default defineComponent({
       url: string;
       name: string;
     }
+    interface AudioFile {
+      audioSrc: string; audioFileName: string
+    }
 
     const progressArrayPNG = ref([
-      { id: "01", name: "UploadPNG", href: "#", status: "current" },
-      { id: "02", name: "UploadBackGround", href: "#", status: "upcoming" },
-      { id: "03", name: "UploadFront", href: "#", status: "" },
-      { id: "04", name: "UploadAudio", href: "#", status: "" },
-      { id: "05", name: "Render", href: "#", status: "" },
+      { id: "01", name: "UploadPNG", href: "#", status: "current", canSkip: false },
+      { id: "02", name: "UploadBackGround", href: "#", status: "upcoming", canSkip: true, },
+      { id: "03", name: "UploadFront", href: "#", status: "", canSkip: true, },
+      { id: "04", name: "UploadAudio", href: "#", status: "", canSkip: true, },
+      { id: "05", name: "Render", href: "#", status: "", canSkip: true, },
     ]);
 
     const pngStep = ref<number>(1);
     const pngBackground = ref<PngFile>({ url: "", name: "" });
     const pngFront = ref<PngFile>({ url: "", name: "" });
+    const Audio = ref<AudioFile>({ audioSrc: "", audioFileName: "" });
     const pngSequence = ref<PngFile[]>([]);
     const selectedImage = ref<PngFile | null>(null);
-    const framerate = ref(30); // Set your desired framerate
+    const framerate = ref(60); // Set your desired framerate
 
     // Limit displayed frames to between 8 and 20
     const limitedFrames = computed(() => {
@@ -52,12 +57,11 @@ export default defineComponent({
     const toggleLightbox = (image: PngFile | null) => {
       selectedImage.value = image;
     };
-      // Computed property to check if all necessary uploads are complete
-      const isReadyToDownload = computed(() => {
+    // Computed property to check if all necessary uploads are complete
+    const isReadyToDownload = computed(() => {
       return (
         pngSequence.value.length > 0 &&
-        pngBackground.value.url !== "" &&
-        pngFront.value.url !== "" &&
+
         pngStep.value === 5 // Check if all steps are complete
       );
     });
@@ -73,6 +77,7 @@ export default defineComponent({
       selectedImage,
       toggleLightbox,
       framerate,
+      Audio
     };
   },
   methods: {
@@ -80,10 +85,12 @@ export default defineComponent({
       const stepIndex = this.progressArrayPNG.findIndex((s) => s.id === step.id.toString());
       if (stepIndex !== -1) {
         this.progressArrayPNG.forEach((s, index) => {
-          s.status = index === stepIndex ? "current" : index < stepIndex ? "complete" : "upcoming";
+          if (s.status != "skipped" && s.status != "complete") s.status = index === stepIndex ? "current" : index < stepIndex ? "skipped" : "upcoming";
         });
         this.pngStep = stepIndex + 1;
       }
+      this.progressArrayPNG[stepIndex].status = "current";
+
     },
     UploadPNG(event: Event) {
       this.pngSequence = handlePNGSequenceUpload(event);
@@ -115,6 +122,22 @@ export default defineComponent({
       this.progressArrayPNG[4].status = "upcoming";
       this.pngStep = 4;
     },
+    UploadAudio(event: Event) {
+      const result = handleAudioUpload(event);
+      if (result) {
+        this.Audio = result;
+      } else {
+        console.error("Failed to upload Audio");
+      }
+      this.progressArrayPNG[3].status = "complete";
+      this.progressArrayPNG[4].status = "current";
+      this.pngStep = 5;
+    },
+    skipStep(step: number) {
+      this.progressArrayPNG[step - 1].status = "skipped";
+      this.progressArrayPNG[step].status = "current";
+      this.pngStep = step + 1;
+    },
     async DownloadVideo() {
       if (!this.isReadyToDownload) {
         alert("Please complete all steps before downloading the video.");
@@ -130,7 +153,8 @@ export default defineComponent({
         this.pngSequence,
         this.pngFront.url,
         this.pngBackground.url,
-        this.framerate
+        this.framerate,
+        this.Audio.audioSrc
       );
 
       // Create a download link
@@ -152,65 +176,37 @@ export default defineComponent({
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="mx-auto max-w-5xl">
         <ProcessSteps :stepsArray="progressArrayPNG" @step-clicked="updateStep" />
-        <UploadFiles
-          v-if="pngStep === 1"
-          title="PNG to Video"
+        <UploadFiles v-if="pngStep === 1" title="PNG to Video"
           description="Upload your PNG's to the application to start the process. Select all png's from one folder"
-          buttonText="Upload Images"
-          @upload="UploadPNG"
-        />
-        <UploadFiles
-          v-if="pngStep === 2"
-          title="Background Image"
+          buttonText="Upload PNGs" filetype="image/png" @upload="UploadPNG" />
+        <UploadFiles v-if="pngStep === 2" title="Background Image"
           description="Upload a background image that will be put behind the PNG sequence. Make sure it has the same aspect ratio as your PNG's"
-          buttonText="Upload Image"
-          @upload="UploadBackground"
-        />
-        <UploadFiles
-          v-if="pngStep === 3"
-          title="Background Front"
+          buttonText="Upload Image" filetype="image/png" :skipButton="true" @skip="skipStep(2)"
+          @upload="UploadBackground" />
+        <UploadFiles v-if="pngStep === 3" title="Visual infront"
           description="Upload an image that will be put in front of the PNG sequence. Make sure it has the same aspect ratio as your PNG's and has transparency"
-          buttonText="Upload Image"
-          @upload="UploadFront"
-        />
-        <DownloadFilesComponent
-          v-if="pngStep === 5"
-          title="Render the video"
-          description="Render the video to a .webm file"
-          buttonText="Download Video"
-          @upload="DownloadVideo"
-        />
+          buttonText="Upload Image" filetype="image/png" :skipButton="true" @skip="skipStep(3)" @upload="UploadFront" />
+        <UploadFiles v-if="pngStep === 4" title="Upload Audio" description="Upload audio that will be put in the video"
+          buttonText="Upload Audio" :skipButton="true" filetype="audio/mp4, audio/wav'" @skip="skipStep(4)"
+          @upload="UploadAudio" />
+        <DownloadFilesComponent v-if="pngStep === 5" title="Render the video"
+          description="Render the video to a .webm file" buttonText="Download Video" @upload="DownloadVideo" />
 
         <!-- Display multiple frames of PNG sequence if available -->
         <div v-if="pngSequence && pngSequence.length" class="mt-5 mb-12">
           <h4 class="text-sm font-semibold text-gray-700">Preview Frames</h4>
           <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-            <div
-              v-for="(frame, index) in limitedFrames"
-              :key="index"
+            <div v-for="(frame, index) in limitedFrames" :key="index"
               class="relative aspect-w-1 aspect-h-1 bg-gray-100 rounded-md overflow-hidden shadow-md cursor-pointer"
-              @click="toggleLightbox(frame)"
-            >
-              <!-- Background image -->
-              <img
-                v-if="pngBackground.url"
-                :src="pngBackground.url"
-                class="absolute inset-0 w-full h-full object-cover"
-                alt="Background Overlay"
-              />
+              @click="toggleLightbox(frame)">
+              <!-- Background image stretched to cover container -->
+              <img v-if="pngBackground.url" :src="pngBackground.url" class="absolute inset-0 w-full h-full"
+                style="object-fit: fill;" alt="pngBackground" />
               <!-- PNG frame -->
-              <img
-                :src="frame.url"
-                :alt="frame.name"
-                class="relative w-full h-full object-contain"
-              />
+              <img :src="frame.url" :alt="frame.name" class="relative w-full h-full object-contain" />
               <!-- Front overlay -->
-              <img
-                v-if="pngFront.url"
-                :src="pngFront.url"
-                class="absolute inset-0 w-full h-full object-cover"
-                alt="Front Overlay"
-              />
+              <img v-if="pngFront.url" :src="pngFront.url" class="absolute inset-0 w-full h-full "
+                style="object-fit: fill;" alt="Front Overlay" />
             </div>
           </div>
         </div>
@@ -218,28 +214,17 @@ export default defineComponent({
     </div>
 
     <!-- Lightbox Modal -->
-    <div v-if="selectedImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80" @click="toggleLightbox(null)">
+    <div v-if="selectedImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
+      @click="toggleLightbox(null)">
       <div class="relative w-full max-w-3xl mx-auto h-auto">
         <!-- Background image in lightbox -->
-        <img
-          v-if="pngBackground.url"
-          :src="pngBackground.url"
-          class="absolute inset-0 w-full h-full object-cover"
-          alt="Background Overlay"
-        />
+        <img v-if="pngBackground.url" :src="pngBackground.url" class="absolute inset-0 w-full h-full " style="object-fit: fill;"
+          alt="pngBackground" />
         <!-- Selected PNG frame in lightbox -->
-        <img
-          :src="selectedImage.url"
-          :alt="selectedImage.name"
-          class="relative w-full h-auto object-contain z-10"
-        />
+        <img :src="selectedImage.url" :alt="selectedImage.name" class="relative w-full h-auto object-contain z-10" />
         <!-- Front overlay in lightbox -->
-        <img
-          v-if="pngFront.url"
-          :src="pngFront.url"
-          class="absolute inset-0 w-full h-full object-cover z-40"
-          alt="Front Overlay"
-        />
+        <img v-if="pngFront.url" :src="pngFront.url" class="absolute inset-0 w-full h-full z-20"
+          style="object-fit: fill;" alt="Front Overlay" />
       </div>
     </div>
   </div>

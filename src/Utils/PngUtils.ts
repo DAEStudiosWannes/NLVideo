@@ -40,6 +40,17 @@ export function handleBottomOverlayUpload(event: Event): { url: string; name: st
 
   return { url: overlayBottomSrc, name: overlayBottomFileName };
 }
+export function handleAudioUpload(event: Event): { audioSrc: string; audioFileName: string } | null {
+  const target = event.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return null;
+
+  const file = target.files[0];
+  const audioSrc = URL.createObjectURL(file);
+  const audioFileName = file.name;
+
+  return { audioSrc, audioFileName };
+}
+
 
 // VideoUtils.ts
 
@@ -80,7 +91,8 @@ export async function downloadVideoFromPNGSequence(
   pngSequence: Array<{ url: string }>,
   overlayTopSrc?: string,
   overlayBottomSrc?: string,
-  framerate = 30,
+  framerate = 60,
+  audioSrc?:string,
   videoBitrate = 10000000 // 10 Mbps
 ): Promise<Blob> {
   // Helper function to handle async processing

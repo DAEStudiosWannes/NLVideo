@@ -13,10 +13,17 @@
           >
             {{ buttonText }}
           </button>
+          <button v-if="skipButton"
+            type="button"
+            @click="triggerSkip"
+            class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ml-2 border border-indigo-600"
+          >
+            skip
+          </button>
           <input
             ref="fileInput"
             type="file"
-            accept="image/png"
+            :accept="filetype"
             multiple
             @change="handleFileChange"
             style="display: none"
@@ -35,6 +42,11 @@
       title: String,
       description: String,
       buttonText: String,
+      filetype:String,
+      skipButton: {
+        type: Boolean,
+        default: false,
+      },
     },
     setup(_, { emit }) {
       const fileInput = ref<HTMLInputElement | null>(null);
@@ -46,10 +58,14 @@
       const handleFileChange = (event: Event) => {
         emit("upload", event); // Emit the event with the input change event as an argument
       };
+      const triggerSkip = () => {
+        emit("skip");
+      };
   
       return {
         triggerFileInput,
         handleFileChange,
+        triggerSkip,
         fileInput,
       };
     },
