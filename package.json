@@ -1,7 +1,13 @@
 {
+  "homepage": "",
   "name": "VideoBuilder",
   "version": "0.1.1",
   "private": true,
+  
+  "author": "Wannes Vanspranghe <wannes.vanspranghe@daestudios.be>",
+  "productName": "WinForLife",
+  "main": "main.js",
+
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
@@ -14,6 +20,7 @@
     "@tiptap/core": "^2.9.1",
     "@tiptap/pm": "^2.9.1",
     "@tiptap/starter-kit": "^2.9.1",
+    "@todesktop/runtime": "^1.6.4",
     "@types/uuid": "^10.0.0",
     "@vue-hero-icons/outline": "^1.7.2",
     "axios": "^1.7.7",
@@ -39,6 +46,7 @@
     "@vue/eslint-config-typescript": "^9.1.0",
     "autoprefixer": "^10.4.20",
     "babel-eslint": "^10.1.0",
+    "electron": "30.0.8",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
     "postcss": "^8.4.47",
